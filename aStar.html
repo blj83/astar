@@ -1,0 +1,530 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+    <title>A* Demo</title>
+
+  </head>
+
+  <body>
+  	<h1>A-Star Demo</h1>
+  	<table>
+  		<tr><td><input id="increase" type="submit" value="Increase Map"></td><td><input id="decrease" type="submit" value="Decrease Map"></td><td><input id="begin" type="submit" value="Place Start"></td><td><input id="end" type="submit" value="Place End"></td><td><input id="obstacle" type="submit" value="Place Obstacle"></td><td><input id="randomize" type="submit" value="Randomize Map"></td><td><input id="start" type="submit" value="Start"></td><td><input id="clear" type="submit" value="Clear"></td></tr>
+  	</table>
+  	
+    <div id = "test">
+		<canvas id="canvas" width="1000" height = "1000"></canvas>
+	</div>
+    
+    <script>
+    
+    var boxesHorizontal = 8, boxesVertical = 6;
+    var currentX = 0, currentY = 0;
+    var WIDTH = 1000, HEIGHT = 1000;
+    var BOX_WIDTH = 50, BOX_HEIGHT = 50;
+    var intervalID;
+    var map;
+    var startX, startY;
+    var endX, endY;
+    var boundryX;
+    
+    //a star variables
+    var openList = [];
+    var closedList = [];
+    var path = [];
+    var pathExists = false;
+    var start = new node();
+    var end = new node();
+    var delay = false;
+    var numRan = -1;
+    var ranX = [];
+    var ranY = [];
+    var boundX = [], boundY = [];
+    var randomized = false;
+    var count=0;
+    var beginPressed = false, endPressed = false, boundaryPressed = false;
+    var boundaryIndex = 0;
+    var boundaryExists = false, startExists = false, endExists = false;
+    
+    document.getElementById('start').onclick = function(){
+    	/*if (!randomized){
+    		alert("Must randomize first!!");
+    	}else{*/
+    	if (!startExists && !endExists){
+    		alert("No start or End");
+    	}else{	
+	    	path = aStar();
+	    	if (path.length > 0){
+	    		pathExists = true;
+	    		//console.log("end");
+	    	}else{
+	    		alert("No path Exists");
+	    	}
+    	}
+    	//drawPath();
+    };
+    
+    document.getElementById('begin').onclick = function(){
+    	beginPressed = true;
+    	endPressed = false;
+    	boundaryPressed = false;
+    };
+    
+    document.getElementById('end').onclick = function(){
+    	beginPressed = false;
+    	endPressed = true;
+    	boundaryPressed = false;
+    };
+    
+    document.getElementById('obstacle').onclick = function(){
+    	beginPressed = false;
+    	endPressed = false;
+    	boundaryPressed = true;
+    };
+    
+    document.getElementById('increase').onclick = function(){
+    	boxesHorizontal++;
+    	boxesVertical++;
+    };
+    
+    document.getElementById('increase').onclick = function(){
+    	boxesHorizontal++;
+    	boxesVertical++;
+    };
+    
+    document.getElementById('increase').onclick = function(){
+    	boxesHorizontal++;
+    	boxesVertical++;
+    };
+    
+    document.getElementById('decrease').onclick = function(){
+    	if (boxesHorizontal > 8){
+    		boxesHorizontal--;
+    		boxesVertical--;	
+    	}
+    };
+    
+    document.getElementById('clear').onclick = function(){
+    	clearEverything();
+    };
+    
+    document.getElementById('randomize').onclick = function(){
+    	startX = Math.floor(Math.random()*(boxesHorizontal));
+		while (startX == boundryX){
+			startX = Math.floor(Math.random()*(boxesHorizontal));
+		}
+    	startY = Math.floor(Math.random()*(boxesVertical));
+		endX = Math.floor(Math.random()*(boxesHorizontal));
+		while (endX == startX || endX == boundryX){
+			endX = Math.floor(Math.random()*(boxesHorizontal));
+		}
+		endY = Math.floor(Math.random()*(boxesVertical));
+		while (endY == startY){
+			endY = Math.floor(Math.random()*(boxesVertical));
+		}
+		
+		var j = 0;
+		for (i=0; i<boxesVertical+12; i++){
+			var randomX = Math.floor(Math.random()*(boxesHorizontal));
+			var randomY = Math.floor(Math.random()*(boxesVertical));
+			if (randomX != startX && randomY != startY && randomX !=endX && randomY != endY){
+				ranX[j]= randomX;
+				ranY[j]= randomY;
+				j++;
+				numRan = j;
+			}
+				
+		}
+		startExists = true;
+		endExists = true;
+		randomized = true;
+    };
+    
+    function init(){
+		canvas = document.getElementById("canvas");
+		ctx = canvas.getContext("2d");
+		intervalID = setInterval(draw, 1000);
+		canvas.addEventListener("click", click, false);
+		//draw();
+	}
+    
+    function click(e){
+    	var clickX = Math.floor((e.pageX - 8)/BOX_WIDTH);
+    	var clickY = Math.floor((e.pageY - 108)/BOX_HEIGHT);
+    	//console.log(clickX + " " + clickY);
+    	if (beginPressed){
+    		startY = clickY;
+    		startX = clickX;
+    		startExists = true;
+    	}else if(endPressed){
+    		endX = clickX;
+    		endY = clickY;
+    		endExists = true;
+    	}else if(boundaryPressed){
+    		boundX[boundaryIndex] = clickX;
+    		boundY[boundaryIndex] = clickY;
+    		boundaryIndex++;
+    		boundaryExists = true;
+    	}
+    	
+    }
+    
+    function findBoundry(){
+    	if (boxesHorizontal%2 != 0){
+    		boundryX = ((boxesHorizontal+1)/2) - 1;
+    	}else if (boxesHorizontal%2 == 0){
+    		boundryX = (boxesHorizontal/2)- 1;
+    	}
+    	//console.log(boundryX);
+    }
+    
+    function node(){
+    	this.x = 0;
+    	this.y = 0;
+    	this.f = 0;
+    	this.g = 0;
+    	this.h = 0;
+    	this.parent = null;
+    	this.map = "";
+    	this.closed = false;
+    	this.diagonal = false;
+    }
+    
+    function aStar(){
+    	openList.push(start);
+		while (openList.length > 0){
+    		
+    		//console.log(openList);
+    		//console.log(closedList);
+    		var lowInd = 0;
+			for(var i=0; i<openList.length; i++) {
+				if(openList[i].f < openList[lowInd].f) { lowInd = i; }
+			}
+			//console.log(lowInd);
+			var currentNode = openList[lowInd];
+    		console.log(currentNode);
+			//Found the path and return the path.
+    		if(currentNode.x == end.x && currentNode.y == end.y) {
+				var curr = currentNode;
+				var ret = [];
+				while(curr.parent) {
+					ret.push(curr);
+					curr = curr.parent;
+				}
+				return ret.reverse();
+			}
+    		
+    		openList.splice(lowInd,1);
+    		console.log(openList);
+    		currentNode.closed = true;
+			closedList.push(currentNode);
+			console.log(closedList);
+			
+			var neighbors = getNeighbors(currentNode);
+			console.log(neighbors);
+			
+			for (i=0; i<neighbors.length; i++){
+				var neighbor = neighbors[i];
+				
+				var g;
+				var best = false;
+				if (neighbor.diagonal){
+					g = currentNode.g + 14;
+				}else{
+					g = currentNode.g + 10;
+				}
+				
+				if (!openList.findNode(neighbor)){
+					//console.log("YUPP")
+					best = true;
+					neighbor.h = ((Math.abs(neighbor.x - end.x)) + (Math.abs(neighbor.y - end.y))) * 10;
+					//console.log(neighbor.h);
+					openList.push(neighbor);
+				}else if(g < neighbor.g){
+					best = true;
+				}
+				
+				if (best){
+					neighbor.parent = currentNode;
+					neighbor.g = g;
+					neighbor.f = neighbor.g + neighbor.h;
+					console.log(neighbor);
+				}
+			}
+			//sleep(1000);
+			//delay = true;
+			//drawLists();
+			//setTimeout(function(){delay = false;},1000);
+			count++;
+			//setTimeout(function(){drawLists()},1);
+			//setTimeout(function(){delay = false;},1000);
+			
+			//console.log(openList);
+			
+		
+		}
+    	return [];
+    }
+    
+    
+    
+    Array.prototype.findNode=function(current){
+    	for (i=0;i<this.length;i++){
+    		if (this[i].x == current.x && this[i].y == current.y){
+    			return true;
+    			console.log("true");
+    		}		  
+    	}    
+    	return false;
+    }
+    
+    /*function sleep(milliseconds) {
+    	var start = new Date().getTime();
+    	while ((new Date().getTime() - start) < milliseconds){
+    	// Do nothing
+    	}
+    	}*/
+    
+    /*function fingH(neighbors){
+    	for (i=0; i < neighbors.length; i++){
+    		neighbors[i].h = ((Math.abs(neighbors[i].x - end.x)) + (Math.abs(neighbors[i].y - end.y))) * 10;
+    	}
+    	
+    }*/
+   /* 
+    function findF(neighbors){
+    	var g = findG(neighbors);
+    	var h = findH(neighbors);
+    	
+    	return g + h; 
+    }*/
+    
+    function getNeighbors(parent){
+    	//console.log(parent.x + " " + parent.y);
+    	
+    	var neighbors = [];
+    	var x = parent.y;
+    	var y = parent.x;
+    	
+    	//above
+    	if((x-1) >= 0) {
+			if(map[x-1][y].map != "O" && !map[x-1][y].closed){
+    			neighbors.push(map[x-1][y]);
+			}	
+		}
+    	//below
+    	if(x+1 < boxesVertical) {
+			if (map[x+1][y].map != "O" && !map[x+1][y].closed){
+				neighbors.push(map[x+1][y]);
+			}
+		}
+    	//left
+    	if(y-1 >= 0) {
+			if (map[x][y-1].map != "O" && !map[x][y-1].closed){
+				neighbors.push(map[x][y-1]);
+			}
+		}
+    	//right
+    	if(y+1 < boxesHorizontal) {
+			if (map[x][y+1].map != "O" && !map[x][y+1].closed){
+				neighbors.push(map[x][y+1]);
+			}
+		}
+    	//diagnal left up
+    	if(x-1 >=0 && y-1 >= 0) {
+			if (map[x-1][y-1].map != "O" && !map[x-1][y-1].closed){
+				map[x-1][y-1].diagonal = true;
+				neighbors.push(map[x-1][y-1]);
+			}
+		}
+    	//diagnal left down
+    	if(x-1 >= 0 && y+1 < boxesHorizontal) {
+			if (map[x-1][y+1].map != "O" && !map[x-1][y+1].closed){
+				map[x-1][y+1].diagonal = true;
+				neighbors.push(map[x-1][y+1]);
+			}
+		}
+    	//diagonal right up
+    	if(x+1 < boxesVertical && y+1 < boxesHorizontal) {
+			if (map[x+1][y+1].map != "O" && !map[x+1][y+1].closed){
+				map[x+1][y+1].diagonal = true;
+				neighbors.push(map[x+1][y+1]);
+			}
+		}
+    	//diagonal right down
+    	if(x+1 < boxesVertical && y-1 >= 0) {
+			if (map[x+1][y-1].map != "O" && !map[x+1][y-1].closed){
+				map[x+1][y-1].diagonal = true;
+				neighbors.push(map[x+1][y-1]);
+			}
+		}
+    	
+		
+    	return neighbors
+    }
+    
+    function drawPath(){
+    	ctx.strokeStyle = "yellow";
+		ctx.lineWidth = 4;
+
+		for (i=0; i<path.length; i++){
+			ctx.strokeRect(path[i].x*BOX_WIDTH,path[i].y*BOX_HEIGHT,BOX_WIDTH,BOX_HEIGHT);
+    	}
+    }
+    
+    function clearEverything(){
+    	openList = [];
+    	closedList = [];
+    	path = [];
+    	boundX = [];
+    	boundY = [];
+    	ranX = [];
+    	ranY = [];
+    	numRan = -1;
+    	startX = -50;
+    	endX = -50;
+    	pathExist = false;
+    	boundaryExists =false;
+    	endExists = false;
+    	startExists = false;
+    	boundaryIndex = 0;
+    }
+    
+    function drawOpenList(){
+    	ctx.strokeStyle = "green";
+    	ctx.fillStyle = "white"
+		ctx.lineWidth = 4;
+    	for (i=0; i<openList.length; i++){
+			ctx.strokeRect(openList[i].x*BOX_WIDTH,openList[i].y*BOX_HEIGHT,BOX_WIDTH,BOX_HEIGHT);
+			ctx.fillText("F: " + openList[i].f, openList[i].x*BOX_WIDTH +15, openList[i].y*BOX_HEIGHT + 15);
+			ctx.fillText("H: " + openList[i].h, openList[i].x*BOX_WIDTH +15, openList[i].y*BOX_HEIGHT + 30);
+			ctx.fillText("G: " + openList[i].g, openList[i].x*BOX_WIDTH +15, openList[i].y*BOX_HEIGHT + 45);
+    	}
+    }
+    
+    function drawClosedList(){
+    	ctx.strokeStyle = "red";
+    	ctx.fillStyle = "white"
+		ctx.lineWidth = 4;
+    	for (i=0; i<closedList.length; i++){
+			ctx.strokeRect(closedList[i].x*BOX_WIDTH,closedList[i].y*BOX_HEIGHT,BOX_WIDTH,BOX_HEIGHT);
+			ctx.fillText("F: " + closedList[i].f, closedList[i].x*BOX_WIDTH +15, closedList[i].y*BOX_HEIGHT + 15);
+			ctx.fillText("H: " + closedList[i].h, closedList[i].x*BOX_WIDTH +15, closedList[i].y*BOX_HEIGHT + 30);
+			ctx.fillText("G: " + closedList[i].g, closedList[i].x*BOX_WIDTH +15, closedList[i].y*BOX_HEIGHT + 45);
+    	}
+    }
+    
+    function drawLists(){
+    	delay = true;
+    	drawOpenList();
+    	drawClosedList();
+    }
+    
+    function generateMap(){
+    	map = new Array(boxesVertical);
+    	for (i = 0; i < boxesVertical; i++) {
+    	    map[i] = new Array(boxesHorizontal);
+    	}
+    	
+    	for (i = 0; i < boxesVertical; i++){
+    		for (j=0; j < boxesHorizontal; j++){
+    			map[i][j] = new node();
+    		}
+    	}
+    	
+    	for (i=0; i < boxesVertical; i++){
+    		for (j=0; j < boxesHorizontal; j++){
+    			if (i == startY && j == startX){
+    				map[i][j].map = "S";
+    				map[i][j].x = j;
+    				map[i][j].y = i; 
+    				start = map[i][j];
+    			}else if (i == endY && j == endX){
+    				map[i][j].map = "G";
+    				map[i][j].x = j;
+    				map[i][j].y = i;
+    				end = map[i][j];
+    			}else if ((i > 1 && i < (boxesVertical - 2))  && j == boundryX){
+    				map[i][j].map = "O";
+    				map[i][j].x = j;
+    				map[i][j].y = i;
+    			}else{
+    				map[i][j].map = "E";
+    				map[i][j].x = j;
+    				map[i][j].y = i;
+    			}
+    		}
+    		
+    	}
+    	
+    	for (i=0; i < boundaryIndex; i++){
+    		var x = boundX[i];
+    		var y = boundY[i];
+    		map[y][x].map = "O";
+    	}
+    	
+    	if (numRan != -1){  	
+	    	for (i=0; i<numRan; i++){
+	    		var x = ranX[i];
+	    		var y = ranY[i];
+	    		map[y][x].map = "O";
+	    	}
+    	}
+    	
+    }
+    
+    function clear(){
+		ctx.clearRect(0,0,WIDTH,HEIGHT);
+	}
+    
+    function drawBoxes(){
+    	ctx.lineWidth = 1;
+    	ctx.fillStyle = "black";
+    	ctx.fillRect(0,0,boxesHorizontal * BOX_WIDTH, boxesVertical * BOX_HEIGHT);
+    	ctx.strokeStyle = "white";
+    	for (i=0; i < boxesVertical; i++){
+    		for (j=0; j < boxesHorizontal; j++){
+    			if (map[i][j].map == "S"){
+    		    	ctx.fillStyle = "green";
+    		    	ctx.fillRect(currentX,currentY,BOX_WIDTH, BOX_HEIGHT);
+    			}else if (map[i][j].map == "G"){
+    		    	ctx.fillStyle = "red";
+    		    	ctx.fillRect(currentX,currentY,BOX_WIDTH, BOX_HEIGHT);
+    			}else if (map[i][j].map == "O"){
+    				ctx.fillStyle = "blue";
+    				//alert("here");
+    		    	ctx.fillRect(currentX,currentY,BOX_WIDTH, BOX_HEIGHT);
+    				//ctx.fill();
+    			}else if (map[i][j].map == "E"){
+        			ctx.strokeRect(currentX,currentY,BOX_WIDTH,BOX_HEIGHT);
+    			}
+       			currentX = currentX + BOX_WIDTH;
+    		}
+    		currentY = currentY + BOX_HEIGHT;
+    		currentX = 0
+    	}
+    	currentY = 0;
+    }
+    
+    function draw(){
+    	clear();
+    	findBoundry();
+    	generateMap();
+    	//console.log(startX + " " + startY)
+    	drawBoxes();
+    	drawLists();
+    	if (pathExists){
+    		drawPath();
+    		ctx.fillStyle ="red";
+			ctx.fillText("Path Length: " + path.length + " Loop Iterations: " + count,boxesHorizontal*BOX_WIDTH/2 - 80, boxesVertical*BOX_HEIGHT + 25);
+    	}
+    	//aStar();
+    }
+    
+    init();
+    //draw();
+	</script>
+	
+  </body>
+</html>
+
